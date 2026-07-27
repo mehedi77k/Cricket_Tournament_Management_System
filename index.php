@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/bootstrap.php';
 
+require_admin();
+
 $pageTitle = 'Dashboard';
 $activePage = 'dashboard';
 
@@ -15,10 +17,15 @@ $counts = [
 ];
 
 $recentMatches = $pdo->query(
-    'SELECT m.match_id, m.match_date,
-            t1.team_name AS team1_name,
-            t2.team_name AS team2_name,
-            tw.team_name AS winner_name
+    'SELECT
+        m.match_id,
+        m.match_date,
+        m.team1_score,
+        m.team2_score,
+        m.result_status,
+        t1.team_name AS team1_name,
+        t2.team_name AS team2_name,
+        tw.team_name AS winner_name
      FROM matches m
      JOIN team t1 ON t1.team_id = m.team1_id
      JOIN team t2 ON t2.team_id = m.team2_id
@@ -28,10 +35,16 @@ $recentMatches = $pdo->query(
 )->fetchAll();
 
 $standings = $pdo->query(
-    'SELECT t.team_name, pt.matches_played, pt.wins, pt.losses, pt.points
+    'SELECT
+        t.team_name,
+        pt.matches_played,
+        pt.wins,
+        pt.losses,
+        pt.draws,
+        pt.points
      FROM points_table pt
      JOIN team t ON t.team_id = pt.team_id
-     ORDER BY pt.points DESC, pt.wins DESC, t.team_name'
+     ORDER BY pt.points DESC, pt.wins DESC, pt.draws DESC, t.team_name'
 )->fetchAll();
 
 $topBatters = $pdo->query(
@@ -97,7 +110,8 @@ require __DIR__ . '/includes/header.php';
                     <tr>
                         <th>Match</th>
                         <th>Date</th>
-                        <th>Winner</th>
+                        <th>Score</th>
+                        <th>Result</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -110,8 +124,17 @@ require __DIR__ . '/includes/header.php';
                             </td>
                             <td><?= h(format_date($match['match_date'])) ?></td>
                             <td>
-                                <?php if ($match['winner_name']): ?>
-                                    <span class="badge badge-success"><?= h($match['winner_name']) ?></span>
+                                <?php if ($match['team1_score'] !== null && $match['team2_score'] !== null): ?>
+                                    <strong><?= (int) $match['team1_score'] ?> - <?= (int) $match['team2_score'] ?></strong>
+                                <?php else: ?>
+                                    <span class="muted">Not entered</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($match['result_status'] === 'completed' && $match['winner_name']): ?>
+                                    <span class="badge badge-success"><?= h($match['winner_name']) ?> won</span>
+                                <?php elseif ($match['result_status'] === 'draw'): ?>
+                                    <span class="badge badge-muted">Draw</span>
                                 <?php else: ?>
                                     <span class="badge badge-warning">Pending</span>
                                 <?php endif; ?>
@@ -130,7 +153,7 @@ require __DIR__ . '/includes/header.php';
         <div class="card-header">
             <div>
                 <h2>Current Standings</h2>
-                <p>Two points are awarded for each win</p>
+                <p>Win = 2 points and draw = 1 point</p>
             </div>
             <a class="btn btn-secondary btn-sm" href="points.php">View Points</a>
         </div>
@@ -145,6 +168,7 @@ require __DIR__ . '/includes/header.php';
                         <th>MP</th>
                         <th>W</th>
                         <th>L</th>
+                        <th>D</th>
                         <th>Pts</th>
                     </tr>
                     </thead>
@@ -156,6 +180,7 @@ require __DIR__ . '/includes/header.php';
                             <td><?= (int) $row['matches_played'] ?></td>
                             <td><?= (int) $row['wins'] ?></td>
                             <td><?= (int) $row['losses'] ?></td>
+                            <td><?= (int) $row['draws'] ?></td>
                             <td><span class="badge badge-dark"><?= (int) $row['points'] ?></span></td>
                         </tr>
                     <?php endforeach; ?>

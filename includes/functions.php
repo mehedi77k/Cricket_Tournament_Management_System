@@ -100,26 +100,41 @@ function recalculate_points(PDO $pdo): void
 
     foreach ($teams as $team) {
         $teamId = (int) $team['team_id'];
+
         $standings[$teamId] = [
             'matches_played' => 0,
             'wins' => 0,
             'losses' => 0,
+            'draws' => 0,
             'points' => 0,
         ];
     }
 
-    $completedMatches = $pdo->query(
-        'SELECT team1_id, team2_id, winner_team_id
+    $finishedMatches = $pdo->query(
+        "SELECT team1_id, team2_id, winner_team_id, result_status
          FROM matches
-         WHERE winner_team_id IS NOT NULL'
+         WHERE result_status IN ('completed', 'draw')"
     )->fetchAll();
 
-    foreach ($completedMatches as $match) {
+    foreach ($finishedMatches as $match) {
         $team1Id = (int) $match['team1_id'];
         $team2Id = (int) $match['team2_id'];
-        $winnerId = (int) $match['winner_team_id'];
+        $winnerId = $match['winner_team_id'] !== null
+            ? (int) $match['winner_team_id']
+            : null;
+        $resultStatus = (string) $match['result_status'];
 
         if (!isset($standings[$team1Id], $standings[$team2Id])) {
+            continue;
+        }
+
+        if ($resultStatus === 'draw') {
+            $standings[$team1Id]['matches_played']++;
+            $standings[$team2Id]['matches_played']++;
+            $standings[$team1Id]['draws']++;
+            $standings[$team2Id]['draws']++;
+            $standings[$team1Id]['points']++;
+            $standings[$team2Id]['points']++;
             continue;
         }
 
@@ -137,13 +152,16 @@ function recalculate_points(PDO $pdo): void
     }
 
     $statement = $pdo->prepare(
-        'INSERT INTO points_table (team_id, matches_played, wins, losses, points)
-         VALUES (:team_id, :matches_played, :wins, :losses, :points)
+        'INSERT INTO points_table
+            (team_id, matches_played, wins, losses, draws, points)
+         VALUES
+            (:team_id, :matches_played, :wins, :losses, :draws, :points)
          ON DUPLICATE KEY UPDATE
-             matches_played = VALUES(matches_played),
-             wins = VALUES(wins),
-             losses = VALUES(losses),
-             points = VALUES(points)'
+            matches_played = VALUES(matches_played),
+            wins = VALUES(wins),
+            losses = VALUES(losses),
+            draws = VALUES(draws),
+            points = VALUES(points)'
     );
 
     $pdo->beginTransaction();
@@ -155,6 +173,7 @@ function recalculate_points(PDO $pdo): void
                 'matches_played' => $data['matches_played'],
                 'wins' => $data['wins'],
                 'losses' => $data['losses'],
+                'draws' => $data['draws'],
                 'points' => $data['points'],
             ]);
         }
@@ -163,9 +182,11 @@ function recalculate_points(PDO $pdo): void
             $pdo->exec('DELETE FROM points_table');
         } else {
             $placeholders = implode(',', array_fill(0, count($standings), '?'));
+
             $deleteStatement = $pdo->prepare(
                 "DELETE FROM points_table WHERE team_id NOT IN ({$placeholders})"
             );
+
             $deleteStatement->execute(array_keys($standings));
         }
 
@@ -174,6 +195,7 @@ function recalculate_points(PDO $pdo): void
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
+
         throw $exception;
     }
 }
@@ -205,4 +227,142 @@ function db_error_message(PDOException $exception): string
         1452 => 'A selected related record does not exist.',
         default => 'Database operation failed: ' . $exception->getMessage(),
     };
+}
+
+
+/* Authentication helpers */
+
+function normalize_email(string $email): string
+{
+    return strtolower(trim($email));
+}
+
+function is_logged_in(): bool
+{
+    return isset($_SESSION['auth_user']['user_id']);
+}
+
+function current_user(): ?array
+{
+    $user = $_SESSION['auth_user'] ?? null;
+    return is_array($user) ? $user : null;
+}
+
+function current_user_id(): int
+{
+    return (int) ($_SESSION['auth_user']['user_id'] ?? 0);
+}
+
+function current_user_name(): string
+{
+    return (string) ($_SESSION['auth_user']['full_name'] ?? '');
+}
+
+function current_user_role(): string
+{
+    return (string) ($_SESSION['auth_user']['role'] ?? 'guest');
+}
+
+function is_admin(): bool
+{
+    return current_user_role() === 'admin';
+}
+
+function dashboard_url(): string
+{
+    return is_admin() ? 'index.php' : 'user_dashboard.php';
+}
+
+function login_user(array $user): void
+{
+    session_regenerate_id(true);
+
+    $_SESSION['auth_user'] = [
+        'user_id' => (int) $user['user_id'],
+        'full_name' => (string) $user['full_name'],
+        'email' => (string) $user['email'],
+        'role' => (string) $user['role'],
+    ];
+
+    unset($_SESSION['csrf_token']);
+}
+
+function logout_user(): void
+{
+    unset($_SESSION['auth_user'], $_SESSION['csrf_token']);
+    session_regenerate_id(true);
+}
+
+function require_guest(): void
+{
+    if (is_logged_in()) {
+        redirect(dashboard_url());
+    }
+}
+
+function require_login(): void
+{
+    if (!is_logged_in()) {
+        set_flash('error', 'Please log in to continue.');
+        redirect('login.php');
+    }
+
+    global $pdo;
+    if ($pdo instanceof PDO && !refresh_session_user($pdo)) {
+        set_flash('error', 'Your session is no longer active. Please log in again.');
+        redirect('login.php');
+    }
+}
+
+function require_admin(): void
+{
+    require_login();
+
+    if (!is_admin()) {
+        set_flash('error', 'Administrator access is required for that page.');
+        redirect('user_dashboard.php');
+    }
+}
+
+function refresh_session_user(PDO $pdo): bool
+{
+    if (!is_logged_in()) {
+        return false;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT user_id, full_name, email, role, status
+         FROM users
+         WHERE user_id = :user_id
+         LIMIT 1'
+    );
+    $statement->execute(['user_id' => current_user_id()]);
+    $user = $statement->fetch();
+
+    if (!$user || $user['status'] !== 'active') {
+        logout_user();
+        return false;
+    }
+
+    $_SESSION['auth_user'] = [
+        'user_id' => (int) $user['user_id'],
+        'full_name' => (string) $user['full_name'],
+        'email' => (string) $user['email'],
+        'role' => (string) $user['role'],
+    ];
+
+    return true;
+}
+
+function validate_password(string $password): ?string
+{
+    if (strlen($password) < 8) {
+        return 'Password must contain at least 8 characters.';
+    }
+
+    if (!preg_match('/[A-Za-z]/', $password) || !preg_match('/\d/', $password)) {
+        return 'Password must contain at least one letter and one number.';
+    }
+
+    return null;
 }

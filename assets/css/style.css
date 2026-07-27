@@ -830,3 +830,117 @@ tbody tr:last-child td {
         flex-direction: column;
     }
 }
+
+
+/* Authentication Pages */
+
+.auth-body {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 30px 15px;
+}
+
+.auth-page {
+    width: 100%;
+    display: grid;
+    place-items: center;
+}
+
+.auth-card {
+    width: min(100%, 470px);
+    padding: 30px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-top: 5px solid #15803d;
+    border-radius: 16px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.10);
+}
+
+.auth-card-wide {
+    width: min(100%, 680px);
+}
+
+.auth-heading {
+    margin-bottom: 24px;
+}
+
+.auth-heading h1 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.auth-heading p:last-child {
+    margin-top: 8px;
+    color: #64748b;
+}
+
+.auth-form {
+    display: grid;
+    gap: 18px;
+}
+
+.auth-submit {
+    width: 100%;
+}
+
+.auth-links {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.auth-links a {
+    color: #15803d;
+    font-weight: 700;
+}
+
+.topbar-account {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.account-chip {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+.account-chip strong,
+.account-chip small {
+    display: block;
+}
+
+.account-chip strong {
+    color: #1e293b;
+    font-size: 13px;
+}
+
+.account-chip small {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.sidebar-user-name {
+    margin-top: 8px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+@media (max-width: 720px) {
+    .auth-card {
+        padding: 22px 18px;
+    }
+
+    .account-chip {
+        display: none;
+    }
+}
