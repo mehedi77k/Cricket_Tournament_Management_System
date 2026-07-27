@@ -1,5 +1,18 @@
 # Cricket Tournament Management System
 
+![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat-square&logo=php&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-00618A?style=flat-square&logo=mysql&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JAVASCRIPT-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white)
+![Apache](https://img.shields.io/badge/APACHE-D22128?style=flat-square&logo=apache&logoColor=white)
+![Laragon](https://img.shields.io/badge/LARAGON-2C3E50?style=flat-square&logoColor=white)
+![PDO](https://img.shields.io/badge/PDO-DATABASE%20CONNECTION-6C757D?style=flat-square)
+![Authentication](https://img.shields.io/badge/AUTHENTICATION-SECURE-198754?style=flat-square&logo=auth0&logoColor=white)
+![Role Based Access](https://img.shields.io/badge/ROLE--BASED%20ACCESS-ADMIN%20%7C%20USER-6F42C1?style=flat-square)
+![Status](https://img.shields.io/badge/STATUS-FUNCTIONAL%20PROTOTYPE-38B000?style=flat-square)
+![Development](https://img.shields.io/badge/ENVIRONMENT-LOCAL%20DEVELOPMENT-0088CC?style=flat-square)
+
 A web-based Cricket Tournament Management System developed with PHP, MySQL, HTML, CSS, and JavaScript. The application provides tournament administration, team and player management, match scheduling, automatic winner calculation, player performance tracking, award management, points-table calculation, and role-based user authentication.
 
 ## Project Overview
