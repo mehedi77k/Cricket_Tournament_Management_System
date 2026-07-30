@@ -6,6 +6,12 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+if (!is_logged_in() || !refresh_session_user($pdo) || !is_admin()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Administrator access is required.']);
+    exit;
+}
+
 $matchId = filter_input(INPUT_GET, 'match_id', FILTER_VALIDATE_INT);
 
 if (!$matchId) {

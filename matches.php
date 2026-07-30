@@ -15,10 +15,14 @@ $editMatch = [
     'team1_id' => '',
     'team2_id' => '',
     'match_date' => date('Y-m-d'),
-    'team1_score' => '',
-    'team2_score' => '',
+    'team1_score' => null,
+    'team1_wickets' => null,
+    'team1_overs' => null,
+    'team2_score' => null,
+    'team2_wickets' => null,
+    'team2_overs' => null,
     'result_status' => 'pending',
-    'winner_team_id' => '',
+    'winner_team_id' => null,
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -30,22 +34,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $team1Id = post_int('team1_id');
         $team2Id = post_int('team2_id');
         $matchDate = post_string('match_date');
+        $matchState = post_string('match_state');
+
         $team1Score = nullable_post_int('team1_score');
+        $team1Wickets = nullable_post_int('team1_wickets');
+        $team1OversInput = nullable_post_string('team1_overs');
         $team2Score = nullable_post_int('team2_score');
+        $team2Wickets = nullable_post_int('team2_wickets');
+        $team2OversInput = nullable_post_string('team2_overs');
 
         $winnerTeamId = null;
         $resultStatus = 'pending';
 
-        $editMatch = [
-            'match_id' => $matchId,
-            'team1_id' => $team1Id,
-            'team2_id' => $team2Id,
-            'match_date' => $matchDate,
-            'team1_score' => $team1Score ?? '',
-            'team2_score' => $team2Score ?? '',
-            'result_status' => $resultStatus,
-            'winner_team_id' => '',
-        ];
+        if (!in_array($matchState, ['pending', 'live', 'completed'], true)) {
+            $matchState = 'pending';
+            $errors[] = 'Select a valid match status.';
+        }
 
         if ($team1Id <= 0 || $team2Id <= 0) {
             $errors[] = 'Select both participating teams.';
@@ -59,36 +63,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Enter a valid match date.';
         }
 
-        if ($team1Score !== null && $team1Score < 0) {
-            $errors[] = 'Team 1 score cannot be negative.';
-        }
-
-        if ($team2Score !== null && $team2Score < 0) {
-            $errors[] = 'Team 2 score cannot be negative.';
-        }
-
-        if (($team1Score === null) !== ($team2Score === null)) {
-            $errors[] = 'Enter both team scores, or leave both score fields empty.';
-        }
-
-        if (!$errors && $team1Score !== null && $team2Score !== null) {
-            if ($team1Score > $team2Score) {
-                $winnerTeamId = $team1Id;
-                $resultStatus = 'completed';
-            } elseif ($team2Score > $team1Score) {
-                $winnerTeamId = $team2Id;
-                $resultStatus = 'completed';
-            } else {
-                $winnerTeamId = null;
-                $resultStatus = 'draw';
+        foreach ([
+            'Team 1 runs' => $team1Score,
+            'Team 2 runs' => $team2Score,
+        ] as $label => $value) {
+            if ($value !== null && $value < 0) {
+                $errors[] = $label . ' cannot be negative.';
             }
-
-            $editMatch['result_status'] = $resultStatus;
-            $editMatch['winner_team_id'] = $winnerTeamId ?? '';
         }
+
+        foreach ([
+            'Team 1 wickets' => $team1Wickets,
+            'Team 2 wickets' => $team2Wickets,
+        ] as $label => $value) {
+            if ($value !== null && ($value < 0 || $value > 10)) {
+                $errors[] = $label . ' must be between 0 and 10.';
+            }
+        }
+
+        if (!is_valid_cricket_overs($team1OversInput)) {
+            $errors[] = 'Team 1 overs must use cricket format, such as 19.4 or 20.';
+        }
+
+        if (!is_valid_cricket_overs($team2OversInput)) {
+            $errors[] = 'Team 2 overs must use cricket format, such as 19.4 or 20.';
+        }
+
+        if ($matchState === 'completed' && ($team1Score === null || $team2Score === null)) {
+            $errors[] = 'Both team runs are required before completing the match.';
+        }
+
+        if ($matchState === 'pending') {
+            $team1Score = null;
+            $team1Wickets = null;
+            $team1Overs = null;
+            $team2Score = null;
+            $team2Wickets = null;
+            $team2Overs = null;
+            $resultStatus = 'pending';
+        } else {
+            $team1Score ??= 0;
+            $team1Wickets ??= 0;
+            $team1Overs = normalize_cricket_overs($team1OversInput) ?? '0.0';
+            $team2Score ??= 0;
+            $team2Wickets ??= 0;
+            $team2Overs = normalize_cricket_overs($team2OversInput) ?? '0.0';
+
+            if ($matchState === 'live') {
+                $resultStatus = 'live';
+            } elseif (!$errors) {
+                if ($team1Score > $team2Score) {
+                    $winnerTeamId = $team1Id;
+                    $resultStatus = 'completed';
+                } elseif ($team2Score > $team1Score) {
+                    $winnerTeamId = $team2Id;
+                    $resultStatus = 'completed';
+                } else {
+                    $resultStatus = 'draw';
+                }
+            }
+        }
+
+        $editMatch = [
+            'match_id' => $matchId,
+            'team1_id' => $team1Id,
+            'team2_id' => $team2Id,
+            'match_date' => $matchDate,
+            'team1_score' => $team1Score,
+            'team1_wickets' => $team1Wickets,
+            'team1_overs' => $team1Overs ?? null,
+            'team2_score' => $team2Score,
+            'team2_wickets' => $team2Wickets,
+            'team2_overs' => $team2Overs ?? null,
+            'result_status' => $resultStatus,
+            'winner_team_id' => $winnerTeamId,
+        ];
 
         if (!$errors) {
             try {
+                $parameters = [
+                    'team1_id' => $team1Id,
+                    'team2_id' => $team2Id,
+                    'match_date' => $matchDate,
+                    'team1_score' => $team1Score,
+                    'team1_wickets' => $team1Wickets,
+                    'team1_overs' => $team1Overs,
+                    'team2_score' => $team2Score,
+                    'team2_wickets' => $team2Wickets,
+                    'team2_overs' => $team2Overs,
+                    'result_status' => $resultStatus,
+                    'winner_team_id' => $winnerTeamId,
+                ];
+
                 if ($matchId > 0) {
                     $statement = $pdo->prepare(
                         'UPDATE matches
@@ -96,47 +162,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                              team2_id = :team2_id,
                              match_date = :match_date,
                              team1_score = :team1_score,
+                             team1_wickets = :team1_wickets,
+                             team1_overs = :team1_overs,
                              team2_score = :team2_score,
+                             team2_wickets = :team2_wickets,
+                             team2_overs = :team2_overs,
                              result_status = :result_status,
                              winner_team_id = :winner_team_id
                          WHERE match_id = :match_id'
                     );
-
-                    $statement->execute([
-                        'team1_id' => $team1Id,
-                        'team2_id' => $team2Id,
-                        'match_date' => $matchDate,
-                        'team1_score' => $team1Score,
-                        'team2_score' => $team2Score,
-                        'result_status' => $resultStatus,
-                        'winner_team_id' => $winnerTeamId,
-                        'match_id' => $matchId,
-                    ]);
-
-                    recalculate_points($pdo);
-                    set_flash('success', 'Match updated. Winner and points were calculated automatically.');
+                    $parameters['match_id'] = $matchId;
+                    $statement->execute($parameters);
+                    $message = 'Match updated successfully.';
                 } else {
                     $statement = $pdo->prepare(
                         'INSERT INTO matches
-                            (team1_id, team2_id, match_date, team1_score, team2_score, result_status, winner_team_id)
+                            (team1_id, team2_id, match_date,
+                             team1_score, team1_wickets, team1_overs,
+                             team2_score, team2_wickets, team2_overs,
+                             result_status, winner_team_id)
                          VALUES
-                            (:team1_id, :team2_id, :match_date, :team1_score, :team2_score, :result_status, :winner_team_id)'
+                            (:team1_id, :team2_id, :match_date,
+                             :team1_score, :team1_wickets, :team1_overs,
+                             :team2_score, :team2_wickets, :team2_overs,
+                             :result_status, :winner_team_id)'
                     );
-
-                    $statement->execute([
-                        'team1_id' => $team1Id,
-                        'team2_id' => $team2Id,
-                        'match_date' => $matchDate,
-                        'team1_score' => $team1Score,
-                        'team2_score' => $team2Score,
-                        'result_status' => $resultStatus,
-                        'winner_team_id' => $winnerTeamId,
-                    ]);
-
-                    recalculate_points($pdo);
-                    set_flash('success', 'Match added. Winner and points were calculated automatically.');
+                    $statement->execute($parameters);
+                    $message = 'Match added successfully.';
                 }
 
+                recalculate_points($pdo);
+
+                if ($resultStatus === 'completed' && $winnerTeamId !== null) {
+                    $message .= ' The winner and points were calculated automatically.';
+                } elseif ($resultStatus === 'draw') {
+                    $message .= ' The match was recorded as a draw and points were recalculated.';
+                } elseif ($resultStatus === 'live') {
+                    $message .= ' The live score is now visible on the dashboards.';
+                }
+
+                //set_flash('success', $message);
                 redirect('matches.php');
             } catch (PDOException $exception) {
                 $errors[] = db_error_message($exception);
@@ -148,18 +213,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $matchId = post_int('match_id');
 
         try {
-            $statement = $pdo->prepare(
-                'DELETE FROM matches WHERE match_id = :match_id'
-            );
-
-            $statement->execute([
-                'match_id' => $matchId,
-            ]);
-
+            $statement = $pdo->prepare('DELETE FROM matches WHERE match_id = :match_id');
+            $statement->execute(['match_id' => $matchId]);
             recalculate_points($pdo);
-            set_flash('success', 'Match deleted and points recalculated.');
+            //set_flash('success', 'Match deleted and points recalculated.');
         } catch (PDOException $exception) {
-            set_flash('error', db_error_message($exception));
+            //set_flash('error', db_error_message($exception));
         }
 
         redirect('matches.php');
@@ -176,18 +235,18 @@ if (isset($_GET['edit'])) {
             team2_id,
             match_date,
             team1_score,
+            team1_wickets,
+            team1_overs,
             team2_score,
+            team2_wickets,
+            team2_overs,
             result_status,
             winner_team_id
          FROM matches
          WHERE match_id = :match_id
          LIMIT 1'
     );
-
-    $statement->execute([
-        'match_id' => $matchId,
-    ]);
-
+    $statement->execute(['match_id' => $matchId]);
     $foundMatch = $statement->fetch();
 
     if ($foundMatch) {
@@ -208,7 +267,11 @@ $matches = $pdo->query(
         m.team2_id,
         m.match_date,
         m.team1_score,
+        m.team1_wickets,
+        m.team1_overs,
         m.team2_score,
+        m.team2_wickets,
+        m.team2_overs,
         m.result_status,
         m.winner_team_id,
         t1.team_name AS team1_name,
@@ -228,7 +291,11 @@ $matches = $pdo->query(
         m.team2_id,
         m.match_date,
         m.team1_score,
+        m.team1_wickets,
+        m.team1_overs,
         m.team2_score,
+        m.team2_wickets,
+        m.team2_overs,
         m.result_status,
         m.winner_team_id,
         t1.team_name,
@@ -236,6 +303,10 @@ $matches = $pdo->query(
         tw.team_name
      ORDER BY m.match_date DESC, m.match_id DESC'
 )->fetchAll();
+
+$formState = in_array($editMatch['result_status'], ['completed', 'draw'], true)
+    ? 'completed'
+    : (string) $editMatch['result_status'];
 
 require __DIR__ . '/includes/header.php';
 ?>
@@ -247,12 +318,12 @@ require __DIR__ . '/includes/header.php';
     </div>
 <?php endif; ?>
 
-<div class="grid grid-2">
+<div class="grid grid-2 matches-layout">
     <section class="card card-accent">
         <div class="card-header">
             <div>
                 <h2><?= (int) $editMatch['match_id'] > 0 ? 'Edit Match' : 'Schedule Match' ?></h2>
-                <p>Enter both team totals to calculate the winner automatically</p>
+                <p>Use Pending, Live, or Completed status to control score calculation</p>
             </div>
         </div>
 
@@ -262,7 +333,7 @@ require __DIR__ . '/includes/header.php';
             </div>
         <?php endif; ?>
 
-        <form method="post" class="form-grid">
+        <form method="post" class="form-grid" id="matchForm">
             <?= csrf_field() ?>
 
             <input type="hidden" name="action" value="save">
@@ -270,10 +341,8 @@ require __DIR__ . '/includes/header.php';
 
             <div class="form-group">
                 <label class="required" for="team1_id">Team 1</label>
-
                 <select id="team1_id" name="team1_id" required>
                     <option value="">Select first team</option>
-
                     <?php foreach ($teams as $team): ?>
                         <option
                             value="<?= (int) $team['team_id'] ?>"
@@ -287,10 +356,8 @@ require __DIR__ . '/includes/header.php';
 
             <div class="form-group">
                 <label class="required" for="team2_id">Team 2</label>
-
                 <select id="team2_id" name="team2_id" required>
                     <option value="">Select second team</option>
-
                     <?php foreach ($teams as $team): ?>
                         <option
                             value="<?= (int) $team['team_id'] ?>"
@@ -302,9 +369,8 @@ require __DIR__ . '/includes/header.php';
                 </select>
             </div>
 
-            <div class="form-group full">
+            <div class="form-group">
                 <label class="required" for="match_date">Match Date</label>
-
                 <input
                     id="match_date"
                     name="match_date"
@@ -315,50 +381,121 @@ require __DIR__ . '/includes/header.php';
             </div>
 
             <div class="form-group">
-                <label for="team1_score">Team 1 Total Score</label>
-
-                <input
-                    id="team1_score"
-                    name="team1_score"
-                    type="number"
-                    min="0"
-                    placeholder="Example: 120"
-                    value="<?= $editMatch['team1_score'] !== null ? h($editMatch['team1_score']) : '' ?>"
-                >
+                <label class="required" for="match_state">Match Status</label>
+                <select id="match_state" name="match_state" required>
+                    <option value="pending" <?= $formState === 'pending' ? 'selected' : '' ?>>Pending / Scheduled</option>
+                    <option value="live" <?= $formState === 'live' ? 'selected' : '' ?>>Live / In Progress</option>
+                    <option value="completed" <?= $formState === 'completed' ? 'selected' : '' ?>>Completed</option>
+                </select>
             </div>
 
-            <div class="form-group">
-                <label for="team2_score">Team 2 Total Score</label>
+            <div class="innings-grid full" id="inningsFields">
+                <fieldset class="innings-card">
+                    <legend>Team 1 Innings</legend>
 
-                <input
-                    id="team2_score"
-                    name="team2_score"
-                    type="number"
-                    min="0"
-                    placeholder="Example: 125"
-                    value="<?= $editMatch['team2_score'] !== null ? h($editMatch['team2_score']) : '' ?>"
-                >
+                    <div class="form-group">
+                        <label for="team1_score">Runs</label>
+                        <input
+                            id="team1_score"
+                            name="team1_score"
+                            type="number"
+                            min="0"
+                            placeholder="166"
+                            value="<?= $editMatch['team1_score'] !== null ? h($editMatch['team1_score']) : '' ?>"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="team1_wickets">Wickets</label>
+                        <input
+                            id="team1_wickets"
+                            name="team1_wickets"
+                            type="number"
+                            min="0"
+                            max="10"
+                            placeholder="7"
+                            value="<?= $editMatch['team1_wickets'] !== null ? h($editMatch['team1_wickets']) : '' ?>"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="team1_overs">Overs</label>
+                        <input
+                            id="team1_overs"
+                            name="team1_overs"
+                            type="text"
+                            inputmode="decimal"
+                            placeholder="20 or 19.4"
+                            value="<?= $editMatch['team1_overs'] !== null ? h(format_cricket_overs($editMatch['team1_overs'])) : '' ?>"
+                        >
+                    </div>
+                </fieldset>
+
+                <fieldset class="innings-card">
+                    <legend>Team 2 Innings</legend>
+
+                    <div class="form-group">
+                        <label for="team2_score">Runs</label>
+                        <input
+                            id="team2_score"
+                            name="team2_score"
+                            type="number"
+                            min="0"
+                            placeholder="150"
+                            value="<?= $editMatch['team2_score'] !== null ? h($editMatch['team2_score']) : '' ?>"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="team2_wickets">Wickets</label>
+                        <input
+                            id="team2_wickets"
+                            name="team2_wickets"
+                            type="number"
+                            min="0"
+                            max="10"
+                            placeholder="8"
+                            value="<?= $editMatch['team2_wickets'] !== null ? h($editMatch['team2_wickets']) : '' ?>"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="team2_overs">Overs</label>
+                        <input
+                            id="team2_overs"
+                            name="team2_overs"
+                            type="text"
+                            inputmode="decimal"
+                            placeholder="20 or 19.4"
+                            value="<?= $editMatch['team2_overs'] !== null ? h(format_cricket_overs($editMatch['team2_overs'])) : '' ?>"
+                        >
+                    </div>
+                </fieldset>
             </div>
 
             <div class="form-group full">
-                <div class="note-box">
-                    Leave both scores empty while the match is pending.
-                    After entering both scores, the higher-scoring team becomes the winner automatically.
-                    Equal scores are recorded as a draw.
-                </div>
+                <small
+                    id="liveSaveStatus"
+                    class="live-save-status"
+                    aria-live="polite"
+                    hidden
+                ></small>
             </div>
 
             <?php if ((int) $editMatch['match_id'] > 0): ?>
                 <div class="form-group full">
                     <label>Current Result</label>
-
-                    <?php if ($editMatch['result_status'] === 'completed'): ?>
-                        <span class="badge badge-success">Completed</span>
-                    <?php elseif ($editMatch['result_status'] === 'draw'): ?>
-                        <span class="badge badge-muted">Draw</span>
-                    <?php else: ?>
-                        <span class="badge badge-warning">Pending</span>
-                    <?php endif; ?>
+                    <div>
+                        <?php if ($editMatch['result_status'] === 'completed'): ?>
+                            <span class="badge badge-success">Completed</span>
+                        <?php elseif ($editMatch['result_status'] === 'draw'): ?>
+                            <span class="badge badge-muted">Draw</span>
+                        <?php elseif ($editMatch['result_status'] === 'live'): ?>
+                            <span class="badge badge-live">Live</span>
+                        <?php else: ?>
+                            <span class="badge badge-warning">Pending</span>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endif; ?>
 
@@ -413,9 +550,7 @@ require __DIR__ . '/includes/header.php';
                 <?php foreach ($matches as $match): ?>
                     <tr>
                         <td>
-                            <strong>
-                                #<?= (int) $match['match_id'] ?> · <?= h($match['team1_name']) ?>
-                            </strong>
+                            <strong>#<?= (int) $match['match_id'] ?> · <?= h($match['team1_name']) ?></strong>
                             <br>
                             <span class="muted">vs <?= h($match['team2_name']) ?></span>
                         </td>
@@ -423,49 +558,32 @@ require __DIR__ . '/includes/header.php';
                         <td><?= h(format_date($match['match_date'])) ?></td>
 
                         <td>
-                            <?php if ($match['team1_score'] !== null && $match['team2_score'] !== null): ?>
-                                <strong>
-                                    <?= h($match['team1_name']) ?>:
-                                    <span class="score-number"><?= (int) $match['team1_score'] ?></span>
-                                </strong>
-                                <br>
-                                <strong>
-                                    <?= h($match['team2_name']) ?>:
-                                    <span class="score-number"><?= (int) $match['team2_score'] ?></span>
-                                </strong>
-                            <?php else: ?>
-                                <span class="muted">Score not entered</span>
-                            <?php endif; ?>
+                            <strong
+                                class="match-score-line"
+                                data-live-score-id="<?= (int) $match['match_id'] ?>"
+                            ><?= h(format_match_score($match)) ?></strong>
                         </td>
 
                         <td>
                             <?php if ($match['result_status'] === 'completed' && $match['winner_name']): ?>
-                                <span class="badge badge-success">
-                                    <?= h($match['winner_name']) ?> won
-                                </span>
+                                <span class="badge badge-success"><?= h($match['winner_name']) ?> won</span>
                             <?php elseif ($match['result_status'] === 'draw'): ?>
                                 <span class="badge badge-muted">Draw</span>
+                            <?php elseif ($match['result_status'] === 'live'): ?>
+                                <span class="badge badge-live">Live</span>
                             <?php else: ?>
                                 <span class="badge badge-warning">Pending</span>
                             <?php endif; ?>
                         </td>
 
                         <td>
-                            <span class="badge badge-muted">
-                                <?= (int) $match['score_count'] ?> player scores
-                            </span>
-
-                            <span class="badge badge-muted">
-                                <?= (int) $match['award_count'] ?> awards
-                            </span>
+                            <span class="badge badge-muted"><?= (int) $match['score_count'] ?> player scores</span>
+                            <span class="badge badge-muted"><?= (int) $match['award_count'] ?> awards</span>
                         </td>
 
                         <td>
                             <div class="table-actions">
-                                <a
-                                    class="btn btn-secondary btn-sm"
-                                    href="matches.php?edit=<?= (int) $match['match_id'] ?>"
-                                >
+                                <a class="btn btn-secondary btn-sm" href="matches.php?edit=<?= (int) $match['match_id'] ?>">
                                     Edit
                                 </a>
 
@@ -475,17 +593,9 @@ require __DIR__ . '/includes/header.php';
                                     data-confirm="Delete this match? Its scores and awards will also be deleted."
                                 >
                                     <?= csrf_field() ?>
-
                                     <input type="hidden" name="action" value="delete">
-                                    <input
-                                        type="hidden"
-                                        name="match_id"
-                                        value="<?= (int) $match['match_id'] ?>"
-                                    >
-
-                                    <button class="btn btn-danger btn-sm" type="submit">
-                                        Delete
-                                    </button>
+                                    <input type="hidden" name="match_id" value="<?= (int) $match['match_id'] ?>">
+                                    <button class="btn btn-danger btn-sm" type="submit">Delete</button>
                                 </form>
                             </div>
                         </td>
@@ -496,7 +606,7 @@ require __DIR__ . '/includes/header.php';
                     <tr>
                         <td colspan="6" class="empty-state">
                             <strong>No matches found</strong>
-                            Schedule a match using the form.
+                            Add the first match using the form.
                         </td>
                     </tr>
                 <?php endif; ?>

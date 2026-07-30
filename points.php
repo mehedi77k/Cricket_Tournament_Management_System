@@ -56,6 +56,10 @@ $pendingMatchCount = (int) $pdo->query(
     "SELECT COUNT(*) FROM matches WHERE result_status = 'pending'"
 )->fetchColumn();
 
+$liveMatchCount = (int) $pdo->query(
+    "SELECT COUNT(*) FROM matches WHERE result_status = 'live'"
+)->fetchColumn();
+
 require __DIR__ . '/includes/header.php';
 ?>
 
@@ -81,7 +85,13 @@ require __DIR__ . '/includes/header.php';
     <article class="stat-card">
         <span class="stat-label">Pending Matches</span>
         <strong class="stat-value"><?= $pendingMatchCount ?></strong>
-        <span class="stat-note">Scores not entered yet</span>
+        <span class="stat-note">Scheduled but not started</span>
+    </article>
+
+    <article class="stat-card">
+        <span class="stat-label">Live Matches</span>
+        <strong class="stat-value"><?= $liveMatchCount ?></strong>
+        <span class="stat-note">Not included in points yet</span>
     </article>
 </div>
 

@@ -14,6 +14,7 @@ $counts = [
     'players' => (int) $pdo->query('SELECT COUNT(*) FROM player')->fetchColumn(),
     'matches' => (int) $pdo->query('SELECT COUNT(*) FROM matches')->fetchColumn(),
     'awards' => (int) $pdo->query('SELECT COUNT(*) FROM match_award')->fetchColumn(),
+    'pending_users' => (int) $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'")->fetchColumn(),
 ];
 
 $recentMatches = $pdo->query(
@@ -21,7 +22,11 @@ $recentMatches = $pdo->query(
         m.match_id,
         m.match_date,
         m.team1_score,
+        m.team1_wickets,
+        m.team1_overs,
         m.team2_score,
+        m.team2_wickets,
+        m.team2_overs,
         m.result_status,
         t1.team_name AS team1_name,
         t2.team_name AS team2_name,
@@ -91,6 +96,11 @@ require __DIR__ . '/includes/header.php';
         <strong class="stat-value"><?= $counts['awards'] ?></strong>
         <span class="stat-note">Recorded achievements</span>
     </article>
+    <article class="stat-card">
+        <span class="stat-label">Pending Users</span>
+        <strong class="stat-value"><?= $counts['pending_users'] ?></strong>
+        <span class="stat-note"><a href="users.php">Review registrations</a></span>
+    </article>
 </div>
 
 <div class="grid grid-equal">
@@ -124,17 +134,15 @@ require __DIR__ . '/includes/header.php';
                             </td>
                             <td><?= h(format_date($match['match_date'])) ?></td>
                             <td>
-                                <?php if ($match['team1_score'] !== null && $match['team2_score'] !== null): ?>
-                                    <strong><?= (int) $match['team1_score'] ?> - <?= (int) $match['team2_score'] ?></strong>
-                                <?php else: ?>
-                                    <span class="muted">Not entered</span>
-                                <?php endif; ?>
+                                <strong class="match-score-line"><?= h(format_match_score($match)) ?></strong>
                             </td>
                             <td>
                                 <?php if ($match['result_status'] === 'completed' && $match['winner_name']): ?>
                                     <span class="badge badge-success"><?= h($match['winner_name']) ?> won</span>
                                 <?php elseif ($match['result_status'] === 'draw'): ?>
                                     <span class="badge badge-muted">Draw</span>
+                                <?php elseif ($match['result_status'] === 'live'): ?>
+                                    <span class="badge badge-live">Live</span>
                                 <?php else: ?>
                                     <span class="badge badge-warning">Pending</span>
                                 <?php endif; ?>
@@ -258,6 +266,7 @@ require __DIR__ . '/includes/header.php';
         <a class="quick-link" href="players.php"><strong>Add or edit players</strong><span>Manage team assignments and playing roles</span></a>
         <a class="quick-link" href="scores.php"><strong>Enter match scores</strong><span>Record runs and wickets for valid players</span></a>
         <a class="quick-link" href="awards.php"><strong>Assign match awards</strong><span>Select award recipients from participating teams</span></a>
+        <a class="quick-link" href="users.php"><strong>Manage accounts</strong><span>Approve registrations and create Admin accounts</span></a>
     </div>
 </section>
 

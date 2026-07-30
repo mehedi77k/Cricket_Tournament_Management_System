@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "INSERT INTO users
                     (full_name, email, password_hash, role, phone, status)
                  VALUES
-                    (:full_name, :email, :password_hash, 'user', :phone, 'active')"
+                    (:full_name, :email, :password_hash, 'user', :phone, 'pending')"
             );
 
             $statement->execute([
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             set_flash(
                 'success',
-                'Registration completed. You can now log in.'
+                'Registration submitted successfully. An Admin must approve your account before you can log in.'
             );
 
             redirect('login.php');
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h1>Create User Account</h1>
 
             <p>
-                This form creates a normal User account.
+                Your registration will remain pending until an Admin approves it.
             </p>
         </div>
 

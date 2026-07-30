@@ -2,16 +2,26 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ .
+    '/includes/bootstrap.php';
 
 require_guest();
 
-$adminCount = (int) $pdo
-    ->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-    ->fetchColumn();
+$superAdminCount =
+    (int) $pdo
+        ->query(
+            "SELECT COUNT(*)
+             FROM users
+             WHERE role = 'super_admin'"
+        )
+        ->fetchColumn();
 
-if ($adminCount > 0) {
-    set_flash('warning', 'The first Admin has already been created.');
+if ($superAdminCount > 0) {
+    set_flash(
+        'warning',
+        'The Super Admin account has already been created.'
+    );
+
     redirect('login.php');
 }
 
@@ -26,63 +36,127 @@ $form = [
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
 
-    $form['full_name'] = post_string('full_name');
-    $form['email'] = normalize_email(post_string('email'));
-    $form['phone'] = post_string('phone');
+    $form['full_name'] =
+        post_string('full_name');
 
-    $password = (string) ($_POST['password'] ?? '');
-    $confirmPassword = (string) ($_POST['confirm_password'] ?? '');
+    $form['email'] =
+        normalize_email(
+            post_string('email')
+        );
 
-    if (strlen($form['full_name']) < 2) {
-        $errors[] = 'Admin name must contain at least 2 characters.';
+    $form['phone'] =
+        post_string('phone');
+
+    $password =
+        (string) (
+            $_POST['password'] ?? ''
+        );
+
+    $confirmPassword =
+        (string) (
+            $_POST['confirm_password']
+            ?? ''
+        );
+
+    if (
+        strlen($form['full_name']) < 2
+    ) {
+        $errors[] =
+            'Super Admin name must contain at least 2 characters.';
     }
 
-    if (!filter_var($form['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Enter a valid email address.';
+    if (
+        !filter_var(
+            $form['email'],
+            FILTER_VALIDATE_EMAIL
+        )
+    ) {
+        $errors[] =
+            'Enter a valid email address.';
     }
 
-    $passwordError = validate_password($password);
+    $passwordError =
+        validate_password($password);
 
     if ($passwordError !== null) {
         $errors[] = $passwordError;
     }
 
-    if ($password !== $confirmPassword) {
-        $errors[] = 'Password confirmation does not match.';
+    if (
+        $password !==
+        $confirmPassword
+    ) {
+        $errors[] =
+            'Password confirmation does not match.';
     }
 
     if (!$errors) {
         try {
             $statement = $pdo->prepare(
                 "INSERT INTO users
-                    (full_name, email, password_hash, role, phone, status)
+                    (
+                        full_name,
+                        email,
+                        password_hash,
+                        role,
+                        phone,
+                        status,
+                        approved_at
+                    )
                  VALUES
-                    (:full_name, :email, :password_hash, 'admin', :phone, 'active')"
+                    (
+                        :full_name,
+                        :email,
+                        :password_hash,
+                        'super_admin',
+                        :phone,
+                        'active',
+                        NOW()
+                    )"
             );
 
             $statement->execute([
-                'full_name' => $form['full_name'],
-                'email' => $form['email'],
-                'password_hash' => password_hash(
-                    $password,
-                    PASSWORD_DEFAULT
-                ),
-                'phone' => $form['phone'] !== ''
-                    ? $form['phone']
-                    : null,
+                'full_name' =>
+                    $form['full_name'],
+
+                'email' =>
+                    $form['email'],
+
+                'password_hash' =>
+                    password_hash(
+                        $password,
+                        PASSWORD_DEFAULT
+                    ),
+
+                'phone' =>
+                    $form['phone'] !== ''
+                        ? $form['phone']
+                        : null,
             ]);
 
             set_flash(
                 'success',
-                'Admin account created successfully. Please log in.'
+                'Super Admin account created successfully. Please log in.'
             );
 
             redirect('login.php');
-        } catch (PDOException $exception) {
-            if ((int) ($exception->errorInfo[1] ?? 0) === 1062) {
-                $errors[] = 'This email address is already registered.';
+
+        } catch (
+            PDOException $exception
+        ) {
+            if (
+                (int) (
+                    $exception->errorInfo[1]
+                    ?? 0
+                ) === 1062
+            ) {
+                $errors[] =
+                    'This email address is already registered.';
             } else {
-                $errors[] = db_error_message($exception);
+                $errors[] =
+                    db_error_message(
+                        $exception
+                    );
             }
         }
     }
@@ -91,13 +165,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Create Admin | Cricket Tournament</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>
+        Create Super Admin
+        |
+        Cricket Tournament
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="assets/css/style.css"
+    >
+
 </head>
 
 <body class="auth-body">
@@ -107,31 +195,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <section class="auth-card auth-card-wide">
 
         <div class="auth-heading">
-            <p class="eyebrow">One-time setup</p>
 
-            <h1>Create First Admin</h1>
+            <p class="eyebrow">
+                One-time setup
+            </p>
+
+            <h1>
+                Create First Super Admin
+            </h1>
 
             <p>
-                This page will stop working after the first Admin is created.
+                This page will stop working after the first Super Admin is created.
             </p>
+
         </div>
 
         <?php if ($errors): ?>
+
             <div class="alert alert-error">
 
-                <?php foreach ($errors as $error): ?>
-                    <div><?= h($error) ?></div>
+                <?php foreach (
+                    $errors as $error
+                ): ?>
+
+                    <div>
+                        <?= h($error) ?>
+                    </div>
+
                 <?php endforeach; ?>
 
             </div>
+
         <?php endif; ?>
 
-        <form method="post" class="form-grid">
+        <form
+            method="post"
+            class="form-grid"
+        >
 
             <?= csrf_field() ?>
 
             <div class="form-group full">
-                <label for="full_name">Admin Full Name</label>
+
+                <label for="full_name">
+                    Super Admin Full Name
+                </label>
 
                 <input
                     type="text"
@@ -140,10 +248,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     value="<?= h($form['full_name']) ?>"
                     required
                 >
+
             </div>
 
             <div class="form-group">
-                <label for="email">Admin Email</label>
+
+                <label for="email">
+                    Super Admin Email
+                </label>
 
                 <input
                     type="email"
@@ -152,10 +264,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     value="<?= h($form['email']) ?>"
                     required
                 >
+
             </div>
 
             <div class="form-group">
-                <label for="phone">Phone</label>
+
+                <label for="phone">
+                    Phone
+                </label>
 
                 <input
                     type="text"
@@ -163,10 +279,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     name="phone"
                     value="<?= h($form['phone']) ?>"
                 >
+
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
+
+                <label for="password">
+                    Password
+                </label>
 
                 <input
                     type="password"
@@ -178,10 +298,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <span class="help-text">
                     Minimum 8 characters with a letter and number.
                 </span>
+
             </div>
 
             <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
+
+                <label for="confirm_password">
+                    Confirm Password
+                </label>
 
                 <input
                     type="password"
@@ -189,16 +313,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     name="confirm_password"
                     required
                 >
+
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">
-                    Create Admin
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Create Super Admin
                 </button>
 
-                <a href="login.php" class="btn btn-light">
+                <a
+                    href="login.php"
+                    class="btn btn-light"
+                >
                     Login
                 </a>
+
             </div>
 
         </form>

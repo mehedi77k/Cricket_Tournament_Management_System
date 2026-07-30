@@ -262,6 +262,11 @@ button {
     grid-template-columns: minmax(300px, 0.75fr) minmax(0, 1.5fr);
 }
 
+/* Make the match entry form wider */
+.matches-layout {
+    grid-template-columns: minmax(620px, 1fr) minmax(0, 1.25fr);
+}
+
 .grid-equal {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -942,5 +947,124 @@ tbody tr:last-child td {
 
     .account-chip {
         display: none;
+    }
+}
+/* Live match scores and account approval */
+.stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.nav-label {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.nav-count {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    display: inline-grid;
+    place-items: center;
+    color: #ffffff;
+    background: #dc2626;
+    font-size: 0.67rem;
+    font-weight: 900;
+}
+
+.innings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    gap: 20px;
+    width: 100%;
+}
+
+.innings-card {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 20px;
+    border: 1px solid var(--green-200);
+    border-radius: 12px;
+    display: grid;
+    gap: 16px;
+    background: var(--green-50);
+}
+
+.innings-card legend {
+    padding: 0 7px;
+    color: var(--green-900);
+    font-size: 0.78rem;
+    font-weight: 900;
+}
+
+.innings-grid.is-pending {
+    opacity: 0.58;
+}
+
+.match-score-line {
+    color: var(--gray-950);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.badge-live {
+    color: #075985;
+    background: #e0f2fe;
+}
+
+.badge-danger {
+    color: var(--red-700);
+    background: var(--red-100);
+}
+
+.approval-list {
+    display: grid;
+    gap: 12px;
+}
+
+.approval-item {
+    padding: 14px;
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: var(--white);
+}
+
+.approval-item strong,
+.approval-item span,
+.approval-item small {
+    display: block;
+}
+
+.approval-item span {
+    margin-top: 3px;
+    color: var(--gray-600);
+    font-size: 0.78rem;
+}
+
+.approval-item small {
+    margin-top: 5px;
+    color: var(--gray-500);
+}
+
+.quick-links {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+@media (max-width: 620px) {
+    .innings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .approval-item {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
