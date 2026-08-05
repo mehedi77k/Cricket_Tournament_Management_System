@@ -1,7 +1,6 @@
 # Cricket Tournament Management System
 
 A PHP and MySQL application for managing a cricket tournament from team setup through match results, player scores, awards, and the points table.
-|
 [![Live Website](https://img.shields.io/badge/Live%20Website-Open%20Now-brightgreen)](https://crickettournament.free.nf/)
 
 ## Overview
