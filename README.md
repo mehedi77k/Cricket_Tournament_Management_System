@@ -385,7 +385,7 @@ Main data groups include:
 | **Match Award** | Stores awards assigned to players for matches |
 | **Points Table** | Stores tournament standings |
 
-The repository also includes a database relationship diagram:
+Entity RelationShip Diagram:
 
 ![Database Design](./CTMSDB.drawio.png)
 
