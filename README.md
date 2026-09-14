@@ -362,7 +362,7 @@ Passwords are not stored as plain text.
 
 ## System Workflow
 
-The repository includes a system workflow diagram:
+
 
 ![System Workflow](./System%20workflow.png)
 
